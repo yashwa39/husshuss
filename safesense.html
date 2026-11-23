@@ -1,0 +1,2358 @@
+<!DOCTYPE html>
+<!--
+  SafeSense – Workplace Gas & Sound Sensor Dashboard
+  ET-201, Team 23  |  University Prototype
+  Single self-contained file. Open by double-clicking – no server needed.
+  All sensor readings are SIMULATED in the browser.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SafeSense – Sensor Dashboard</title>
+<style>
+/* ================================================================
+   DESIGN TOKENS & RESET
+   ================================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #F4F4F4;
+  --white:       #FFFFFF;
+  --navy:        #14243F;
+  --navy-soft:   #2C3E5D;
+  --primary:     #2748D8;
+  --primary-soft:#EBF0FF;
+
+  --green:       #1B7F55;
+  --green-bg:    #E8F5EE;
+  --amber:       #B7791F;
+  --amber-bg:    #FEF3E2;
+  --red:         #C62828;
+  --red-bg:      #FDECEA;
+  --grey:        #6B7280;
+  --grey-bg:     #F3F4F6;
+
+  --border:      #E2E5EA;
+  --shadow:      0 1px 4px rgba(0,0,0,.08);
+  --shadow-md:   0 2px 10px rgba(0,0,0,.10);
+
+  --r-sm:  8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+
+  --sidebar-w: 220px;
+  --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font);
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--navy);
+  line-height: 1.5;
+}
+
+/* ================================================================
+   UTILITY CLASSES
+   ================================================================ */
+.hidden   { display: none !important; }
+.flex     { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.gap-4    { gap: 4px; }
+.gap-8    { gap: 8px; }
+.gap-12   { gap: 12px; }
+.gap-16   { gap: 16px; }
+.gap-24   { gap: 24px; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.text-sm  { font-size: 12px; }
+.text-xs  { font-size: 11px; }
+.font-semi { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.muted    { color: var(--grey); }
+.truncate { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* ================================================================
+   CHIP / BADGE
+   ================================================================ */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.chip-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.chip.normal  { background: var(--green-bg);  color: var(--green); }
+.chip.warning { background: var(--amber-bg);  color: var(--amber); }
+.chip.critical{ background: var(--red-bg);    color: var(--red);   }
+.chip.error   { background: var(--grey-bg);   color: var(--grey);  }
+.chip.normal  .chip-dot { background: var(--green); }
+.chip.warning .chip-dot { background: var(--amber); }
+.chip.critical .chip-dot{ background: var(--red);  }
+.chip.error   .chip-dot { background: var(--grey); }
+
+/* critical pulse animation */
+@keyframes pulse-red {
+  0%,100% { box-shadow: 0 0 0 0 rgba(198,40,40,.35); }
+  50%      { box-shadow: 0 0 0 5px rgba(198,40,40,.0); }
+}
+.chip.critical { animation: pulse-red 1.6s ease infinite; }
+
+/* ================================================================
+   CARD
+   ================================================================ */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+}
+
+/* ================================================================
+   BUTTON
+   ================================================================ */
+button {
+  font-family: var(--font);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  padding: 10px 22px;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 600;
+  transition: opacity .15s;
+}
+.btn-primary:hover { opacity: .88; }
+.btn-primary:focus-visible { outline: 3px solid #93a8f4; outline-offset: 2px; }
+
+.btn-ghost {
+  color: var(--primary);
+  padding: 8px 14px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--primary);
+  transition: background .15s;
+}
+.btn-ghost:hover { background: var(--primary-soft); }
+
+/* ================================================================
+   INPUT
+   ================================================================ */
+.input-wrap { display: flex; flex-direction: column; gap: 5px; }
+.input-wrap label { font-size: 13px; font-weight: 600; color: var(--navy-soft); }
+.input-wrap input {
+  padding: 9px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-family: var(--font);
+  color: var(--navy);
+  background: var(--white);
+  transition: border-color .15s;
+}
+.input-wrap input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(39,72,216,.12);
+}
+
+/* ================================================================
+   SCREEN LAYER – screens are toggled with .hidden
+   ================================================================ */
+.screen { width: 100%; min-height: 100vh; }
+
+/* ================================================================
+   LOGIN SCREEN
+   ================================================================ */
+#screen-login {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  padding: 24px;
+}
+.login-card {
+  width: 100%; max-width: 400px;
+  padding: 40px 36px;
+  border-radius: var(--r-lg);
+}
+.login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+.login-logo svg { flex-shrink: 0; }
+.login-logo-text { font-size: 20px; font-weight: 700; color: var(--navy); letter-spacing: -.3px; }
+.login-logo-sub  { font-size: 11px; color: var(--grey); font-weight: 400; }
+.login-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.login-sub   { font-size: 13px; color: var(--grey); margin-bottom: 24px; }
+.login-form  { display: flex; flex-direction: column; gap: 16px; }
+#login-error {
+  background: var(--red-bg); color: var(--red);
+  border: 1px solid #f5c6c6;
+  border-radius: var(--r-sm);
+  padding: 9px 13px; font-size: 13px;
+}
+.login-hint {
+  margin-top: 20px; padding: 12px 14px;
+  background: var(--primary-soft);
+  border-radius: var(--r-sm);
+  font-size: 12px; color: var(--navy-soft);
+}
+.login-hint strong { color: var(--primary); }
+.login-skip {
+  display: block; text-align: center;
+  margin-top: 16px; font-size: 12px;
+  color: var(--grey); text-decoration: underline;
+  cursor: pointer;
+}
+.login-skip:hover { color: var(--primary); }
+
+/* ================================================================
+   APP SHELL (sidebar + main)
+   ================================================================ */
+#screen-app {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* --- Sidebar --- */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--navy);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  transition: transform .25s;
+}
+.sidebar-logo {
+  padding: 20px 18px 16px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.sidebar-logo-text { font-size: 16px; font-weight: 700; color: #fff; letter-spacing: -.2px; }
+.sidebar-logo-sub  { font-size: 10px; color: rgba(255,255,255,.45); }
+
+.sidebar-zone {
+  margin: 14px 12px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,.07);
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.sidebar-zone-name { font-size: 12px; font-weight: 600; color: #fff; }
+.sidebar-zone-sub  { font-size: 11px; color: rgba(255,255,255,.5); }
+
+.sidebar-nav { flex: 1; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 500; color: rgba(255,255,255,.65);
+  cursor: pointer; transition: background .15s, color .15s;
+  border: none; background: none; width: 100%; text-align: left;
+}
+.nav-item:hover   { background: rgba(255,255,255,.08); color: #fff; }
+.nav-item.active  { background: rgba(39,72,216,.55);   color: #fff; }
+.nav-item:focus-visible { outline: 2px solid #93a8f4; outline-offset: -2px; }
+
+.sidebar-footer {
+  padding: 14px 14px 18px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.sidebar-user { display: flex; align-items: center; gap: 10px; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.sidebar-user-name { font-size: 13px; font-weight: 600; color: #fff; }
+.sidebar-user-role { font-size: 11px; color: rgba(255,255,255,.5); }
+.sidebar-proto {
+  font-size: 10px; color: rgba(255,255,255,.35);
+  background: rgba(255,255,255,.05);
+  padding: 4px 8px; border-radius: 4px;
+  text-align: center;
+}
+.btn-logout {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: rgba(255,255,255,.5);
+  padding: 7px 10px; border-radius: var(--r-sm);
+  transition: background .15s, color .15s; width: 100%; text-align: left;
+}
+.btn-logout:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+/* --- Main content --- */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* --- Topbar --- */
+.topbar {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 50;
+}
+.breadcrumb { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.breadcrumb-sep { color: var(--border); }
+
+/* --- Page content wrapper --- */
+.page { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.page-title { font-size: 20px; font-weight: 700; }
+
+/* ================================================================
+   DEMO MODE SEGMENTED SWITCH
+   ================================================================ */
+.seg-switch {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--grey-bg);
+  border-radius: var(--r-sm);
+  padding: 3px;
+  border: 1px solid var(--border);
+}
+.seg-label { font-size: 12px; color: var(--grey); padding: 0 4px; font-weight: 500; }
+.seg-btn {
+  padding: 5px 11px; border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+  color: var(--grey); transition: background .15s, color .15s;
+}
+.seg-btn.active { background: var(--white); color: var(--navy); box-shadow: var(--shadow); }
+.seg-btn:hover:not(.active) { background: rgba(0,0,0,.04); }
+
+/* ================================================================
+   STATUS BANNER
+   ================================================================ */
+.status-banner {
+  border-radius: var(--r-md);
+  padding: 14px 18px;
+  border: 1px solid;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.status-banner.normal   { background: var(--green-bg); border-color: #b2d9c5; color: var(--green); }
+.status-banner.warning  { background: var(--amber-bg); border-color: #f0cc8c; color: var(--amber); }
+.status-banner.critical { background: var(--red-bg);   border-color: #f1a0a0; color: var(--red); }
+.status-banner-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.status-banner ul { margin: 6px 0 6px 18px; }
+.status-banner li { margin-bottom: 2px; }
+.status-banner-action { margin-top: 8px; font-weight: 600; }
+
+/* ================================================================
+   SENSOR CARDS ROW
+   ================================================================ */
+.sensor-cards-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.sensor-card { padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+.sensor-card-header { display: flex; align-items: center; gap: 10px; }
+.sensor-icon {
+  width: 36px; height: 36px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.sensor-icon.sound    { background: #E8EEFF; }
+.sensor-icon.co       { background: #FEF3E2; }
+.sensor-icon.h2s      { background: #FFF0E8; }
+.sensor-icon.methane  { background: #F0F8F0; }
+.sensor-card-name  { font-size: 12px; font-weight: 600; color: var(--grey); line-height: 1.3; }
+.sensor-card-value { font-size: 28px; font-weight: 700; color: var(--navy); line-height: 1; }
+.sensor-card-unit  { font-size: 13px; font-weight: 400; color: var(--grey); margin-left: 3px; }
+.sensor-card-footer { display: flex; align-items: center; justify-content: space-between; }
+.sensor-limits { font-size: 11px; color: var(--grey); }
+
+/* threshold bar */
+.thresh-bar-wrap { position: relative; height: 8px; border-radius: 999px; overflow: visible; }
+.thresh-bar-track {
+  position: absolute; inset: 0; border-radius: 999px;
+  display: flex; overflow: hidden;
+}
+.thresh-seg { height: 100%; }
+.thresh-seg.g { background: var(--green); opacity: .28; }
+.thresh-seg.a { background: var(--amber); opacity: .38; }
+.thresh-seg.r { background: var(--red);   opacity: .40; }
+.thresh-marker {
+  position: absolute; top: 50%; transform: translate(-50%,-50%);
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--white);
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  transition: left .4s cubic-bezier(.4,0,.2,1), background .4s;
+  z-index: 2;
+}
+
+/* ================================================================
+   BOTTOM PANELS (chart + alerts)
+   ================================================================ */
+.bottom-panels {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 20px;
+}
+.panel-title  { font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+.chart-panel  { padding: 20px; }
+.alerts-panel { padding: 20px; }
+
+/* chart controls */
+.chart-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.chart-selector {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-family: var(--font);
+  background: var(--white);
+  color: var(--navy);
+}
+.chart-selector:focus { outline: 2px solid var(--primary); }
+.chart-legend { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--grey); }
+.legend-line { width: 20px; height: 2px; }
+.legend-line.warn { background: var(--amber); }
+.legend-line.crit { background: var(--red); }
+.legend-line.data { background: var(--primary); }
+
+/* SVG chart */
+.chart-svg { width: 100%; border-radius: var(--r-sm); overflow: visible; }
+
+/* alert list */
+.alert-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.alert-item:last-child { border-bottom: none; }
+.alert-time  { font-size: 11px; color: var(--grey); white-space: nowrap; flex-shrink: 0; }
+.alert-body  { flex: 1; min-width: 0; }
+.alert-name  { font-size: 12px; font-weight: 600; }
+.alert-val   { font-size: 11px; color: var(--grey); }
+.alerts-empty { text-align: center; padding: 32px 0; color: var(--grey); font-size: 13px; }
+
+/* ================================================================
+   TOAST
+   ================================================================ */
+#toast-container {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  background: var(--red); color: #fff;
+  padding: 12px 18px; border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 600;
+  box-shadow: var(--shadow-md);
+  display: flex; align-items: center; gap: 10px;
+  animation: slideIn .3s ease;
+  pointer-events: auto;
+  max-width: 320px;
+}
+@keyframes slideIn {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ================================================================
+   TEST RESULTS SCREEN
+   ================================================================ */
+.summary-cards {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+}
+.summary-card { padding: 18px 20px; }
+.summary-num  { font-size: 32px; font-weight: 700; line-height: 1; }
+.summary-lbl  { font-size: 12px; color: var(--grey); margin-top: 4px; }
+.summary-num.green  { color: var(--green); }
+.summary-num.amber  { color: var(--amber); }
+.summary-num.navy   { color: var(--navy);  }
+
+.filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-chip {
+  padding: 5px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border);
+  color: var(--grey); background: var(--white);
+  cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.filter-chip.active  { background: var(--primary); color: #fff; border-color: var(--primary); }
+.filter-chip:hover:not(.active) { background: var(--grey-bg); }
+.filter-chip-count {
+  display: inline-block;
+  background: rgba(0,0,0,.10);
+  border-radius: 999px;
+  padding: 0 6px; margin-left: 4px;
+  font-size: 10px;
+}
+
+.tests-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tests-table th {
+  text-align: left; padding: 10px 12px;
+  background: var(--grey-bg);
+  border-bottom: 2px solid var(--border);
+  font-size: 11px; font-weight: 700;
+  color: var(--grey); text-transform: uppercase; letter-spacing: .4px;
+}
+.tests-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.tests-table tr:last-child td { border-bottom: none; }
+.tests-table tr.expandable { cursor: pointer; }
+.tests-table tr.expandable:hover td { background: var(--grey-bg); }
+.tests-table tr.detail-row td { background: var(--grey-bg); padding: 0; }
+.detail-content {
+  padding: 16px 20px;
+  display: grid; grid-template-columns: 1fr auto; gap: 20px;
+}
+.oop-concept-pill {
+  display: inline-block; padding: 2px 9px;
+  background: var(--primary-soft); color: var(--primary);
+  border-radius: 999px; font-size: 10px; font-weight: 700;
+}
+.result-chip { padding: 2px 9px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+.result-chip.PASS  { background: var(--green-bg); color: var(--green); }
+.result-chip.FIXED { background: var(--amber-bg); color: var(--amber); }
+.result-chip.FAIL  { background: var(--red-bg);   color: var(--red);   }
+
+.bug-card {
+  background: var(--red-bg); border: 1px solid #f1a0a0;
+  border-radius: var(--r-sm); padding: 14px 16px;
+  font-size: 12px; line-height: 1.7;
+  min-width: 260px; max-width: 320px;
+}
+.bug-card-title { font-weight: 700; color: var(--red); font-size: 13px; margin-bottom: 8px; }
+.bug-row { display: flex; gap: 8px; }
+.bug-label { font-weight: 700; color: var(--navy-soft); min-width: 70px; }
+
+.live-tests-output {
+  background: #111827; color: #d1fae5;
+  border-radius: var(--r-sm); padding: 16px 18px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px; line-height: 1.8;
+  max-height: 340px; overflow-y: auto;
+  margin-top: 14px;
+  white-space: pre-wrap;
+}
+.sample-banner {
+  background: var(--amber-bg); border: 1px solid #f0cc8c;
+  border-radius: var(--r-sm); padding: 10px 16px;
+  font-size: 12px; color: var(--amber);
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* ================================================================
+   OOP CODE SCREEN
+   ================================================================ */
+.oop-tabs { display: flex; gap: 2px; border-bottom: 2px solid var(--border); margin-bottom: 20px; flex-wrap: wrap; }
+.oop-tab {
+  padding: 9px 18px; font-size: 13px; font-weight: 600;
+  color: var(--grey); border-bottom: 2px solid transparent;
+  margin-bottom: -2px; transition: color .15s, border-color .15s;
+  cursor: pointer;
+}
+.oop-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.oop-tab:hover:not(.active) { color: var(--navy); }
+
+.oop-panel { display: none; }
+.oop-panel.active { display: grid; grid-template-columns: 1fr 240px; gap: 20px; }
+
+.code-box {
+  background: #1E2433; border-radius: var(--r-md);
+  overflow: auto; max-height: 480px;
+}
+.code-box pre {
+  padding: 20px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px; line-height: 1.75;
+  color: #E2E8F0;
+  margin: 0;
+  white-space: pre;
+}
+.code-box .kw  { color: #93C5FD; }   /* keyword */
+.code-box .cm  { color: #6B7280; font-style: italic; } /* comment */
+.code-box .str { color: #86EFAC; }   /* string  */
+.code-box .num { color: #FDE68A; }   /* number  */
+.code-box .ann { color: #C084FC; }   /* annotation */
+.code-box .cls { color: #67E8F9; }   /* class name */
+
+.oop-concept-panel {
+  background: var(--primary-soft);
+  border-radius: var(--r-md);
+  padding: 18px;
+  display: flex; flex-direction: column; gap: 16px;
+  height: fit-content;
+}
+.concept-tag {
+  background: var(--primary); color: #fff;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  display: inline-block; margin-bottom: 4px;
+}
+.concept-desc { font-size: 12px; line-height: 1.6; color: var(--navy-soft); }
+
+.run-demo-output {
+  background: #111827; color: #d1fae5;
+  border-radius: var(--r-sm); padding: 14px 18px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px; line-height: 1.8;
+  margin-top: 14px; min-height: 60px;
+  white-space: pre-wrap;
+}
+
+/* ================================================================
+   RESPONSIVE – sidebar collapses to top menu below 768px
+   ================================================================ */
+.mobile-topbar {
+  display: none;
+  background: var(--navy);
+  padding: 12px 16px;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 200;
+}
+.mobile-topbar-logo { font-size: 15px; font-weight: 700; color: #fff; }
+.hamburger {
+  display: flex; flex-direction: column; gap: 4px; cursor: pointer; padding: 4px;
+}
+.hamburger span { display: block; width: 20px; height: 2px; background: #fff; border-radius: 2px; }
+
+@media (max-width: 768px) {
+  .mobile-topbar { display: flex; }
+  .sidebar {
+    transform: translateX(-100%);
+    top: 48px;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .sensor-cards-row { grid-template-columns: repeat(2, 1fr); }
+  .bottom-panels    { grid-template-columns: 1fr; }
+  .summary-cards    { grid-template-columns: repeat(2, 1fr); }
+  .oop-panel.active { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .sensor-cards-row { grid-template-columns: 1fr; }
+  .summary-cards    { grid-template-columns: 1fr; }
+  .page { padding: 14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Mobile top bar (visible < 768px) -->
+<div class="mobile-topbar" id="mobile-topbar">
+  <span class="mobile-topbar-logo">SafeSense</span>
+  <div class="hamburger" id="hamburger" aria-label="Toggle menu" tabindex="0" role="button">
+    <span></span><span></span><span></span>
+  </div>
+</div>
+
+<!-- ================================================================
+     SCREEN A: LOGIN
+     ================================================================ -->
+<div id="screen-login" class="screen">
+  <div class="login-card card">
+
+    <!-- Logo -->
+    <div class="login-logo">
+      <!-- Inline SVG shield icon -->
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+        <rect width="36" height="36" rx="8" fill="#2748D8"/>
+        <path d="M18 7l9 4v7c0 5-4 9.5-9 11-5-1.5-9-6-9-11V11l9-4z" fill="white" opacity=".9"/>
+        <circle cx="18" cy="19" r="4" fill="#2748D8"/>
+        <rect x="17" y="13" width="2" height="5" rx="1" fill="#2748D8"/>
+      </svg>
+      <div>
+        <div class="login-logo-text">SafeSense</div>
+        <div class="login-logo-sub">ET-201 · Team 23 · Prototype</div>
+      </div>
+    </div>
+
+    <div class="login-title">Sign in</div>
+    <div class="login-sub">Access the sensor monitoring dashboard</div>
+
+    <!-- NOTE: This is a front-end demo login only. No real authentication or
+         server communication occurs. The password is compared in plain JS for
+         demonstration purposes. A real system would use hashed credentials
+         verified server-side. See AuthenticationError class in the JS. -->
+    <form class="login-form" id="login-form" novalidate>
+      <div id="login-error" class="hidden" role="alert"></div>
+      <div class="input-wrap">
+        <label for="login-email">Email address</label>
+        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="username" />
+      </div>
+      <div class="input-wrap">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <button type="submit" class="btn-primary">Log in</button>
+    </form>
+
+    <!-- Demo credentials hint for faculty -->
+    <div class="login-hint">
+      <strong>Demo account</strong><br/>
+      Email: <strong>aisha@demo.com</strong> &nbsp;·&nbsp; Password: <strong>Demo@123</strong>
+    </div>
+
+    <!-- Skip link so faculty are never blocked by the login screen -->
+    <a class="login-skip" id="skip-login" tabindex="0" role="link">Skip to dashboard →</a>
+  </div>
+</div>
+
+<!-- ================================================================
+     SCREEN B/C/D: APP SHELL (Dashboard + Test Results + OOP Code)
+     ================================================================ -->
+<div id="screen-app" class="screen hidden">
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar" aria-label="Main navigation">
+
+    <!-- Logo -->
+    <div class="sidebar-logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <rect width="28" height="28" rx="6" fill="#2748D8"/>
+        <path d="M14 4l7 3.5V13c0 4-3 7.5-7 8.5-4-1-7-4.5-7-8.5V7.5L14 4z" fill="white" opacity=".9"/>
+        <circle cx="14" cy="14.5" r="3" fill="#2748D8"/>
+      </svg>
+      <div>
+        <div class="sidebar-logo-text">SafeSense</div>
+        <div class="sidebar-logo-sub">ET-201 · Team 23</div>
+      </div>
+    </div>
+
+    <!-- Zone card -->
+    <div class="sidebar-zone">
+      <div class="sidebar-zone-name">Workshop Line 2</div>
+      <div class="sidebar-zone-sub">Plant A</div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="sidebar-nav">
+      <button class="nav-item active" data-nav="dashboard" aria-current="page">
+        <!-- Dashboard icon -->
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/>
+          <rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/>
+          <rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/>
+          <rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/>
+        </svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-nav="tests">
+        <!-- Clipboard icon -->
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="3" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" fill="none" opacity=".7"/>
+          <path d="M5 7h6M5 10h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>
+          <rect x="6" y="1" width="4" height="3" rx="1" fill="currentColor" opacity=".7"/>
+        </svg>
+        Test results
+      </button>
+      <button class="nav-item" data-nav="oop">
+        <!-- Code icon -->
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M5 5L2 8l3 3M11 5l3 3-3 3M9 4l-2 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>
+        </svg>
+        OOP code
+      </button>
+    </div>
+
+    <!-- Footer: user info + logout -->
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar" id="sidebar-avatar">AK</div>
+        <div>
+          <div class="sidebar-user-name" id="sidebar-name">Aisha Khan</div>
+          <div class="sidebar-user-role" id="sidebar-role">Supervisor</div>
+        </div>
+      </div>
+      <div class="sidebar-proto">Prototype · simulated data</div>
+      <button class="btn-logout" id="btn-logout">
+        <!-- Logout icon -->
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M9 2h3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M6 9.5L9 7l-3-2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="9" y1="7" x2="2" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        Log out
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <div class="main-content">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="breadcrumb">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M2 5.5L7 1l5 4.5V13H9V9H5v4H2V5.5z" stroke="#6B7280" stroke-width="1.3" fill="none"/>
+        </svg>
+        <span class="muted">Workshop Line 2</span>
+        <span class="breadcrumb-sep">›</span>
+        <span style="font-weight:600">Plant A</span>
+      </div>
+      <!-- Overall zone status pill in topbar -->
+      <div id="topbar-status"></div>
+    </div>
+
+    <!-- ===================== PAGE: DASHBOARD ===================== -->
+    <div id="page-dashboard" class="page">
+
+      <!-- Page header row -->
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="dash-greeting">Hello, Aisha</div>
+          <div class="text-sm muted" id="dash-updated">Updated just now</div>
+        </div>
+        <!-- Demo mode segmented switch -->
+        <div>
+          <div class="seg-switch" role="group" aria-label="Demo data mode">
+            <span class="seg-label">Demo data:</span>
+            <button class="seg-btn active" data-mode="AUTO">Auto</button>
+            <button class="seg-btn" data-mode="NORMAL">Normal</button>
+            <button class="seg-btn" data-mode="WARNING">Warning</button>
+            <button class="seg-btn" data-mode="CRITICAL">Critical</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status banner (tinted, full width) -->
+      <div id="status-banner" class="status-banner normal">
+        <div class="status-banner-title" id="banner-title">All readings are within safe limits.</div>
+        <div id="banner-bullets"></div>
+        <div class="status-banner-action" id="banner-action"></div>
+      </div>
+
+      <!-- Four sensor cards -->
+      <div class="sensor-cards-row" id="sensor-cards-row"></div>
+
+      <!-- Bottom panels: chart + alerts -->
+      <div class="bottom-panels">
+
+        <!-- Left: SVG line chart -->
+        <div class="card chart-panel">
+          <div class="panel-title">Last 60 seconds</div>
+          <div class="chart-controls">
+            <select class="chart-selector" id="chart-sensor-select" aria-label="Select sensor for chart">
+              <option value="0">Sound Level</option>
+              <option value="1">Carbon Monoxide</option>
+              <option value="2">Hydrogen Sulfide</option>
+              <option value="3">Methane</option>
+            </select>
+            <div class="chart-legend">
+              <div class="legend-item"><div class="legend-line data"></div>Reading</div>
+              <div class="legend-item"><div class="legend-line warn" style="border-top:2px dashed #B7791F;height:0;width:20px;"></div>Warning</div>
+              <div class="legend-item"><div class="legend-line crit" style="border-top:2px dashed #C62828;height:0;width:20px;"></div>Critical</div>
+            </div>
+          </div>
+          <!-- SVG chart rendered by JS -->
+          <svg id="line-chart" class="chart-svg" viewBox="0 0 540 200" aria-label="Sensor readings over last 60 seconds"></svg>
+        </div>
+
+        <!-- Right: Recent alerts -->
+        <div class="card alerts-panel">
+          <div class="panel-title">Recent alerts</div>
+          <div id="alerts-list"></div>
+        </div>
+
+      </div>
+    </div><!-- /page-dashboard -->
+
+    <!-- ===================== PAGE: TEST RESULTS ===================== -->
+    <div id="page-tests" class="page hidden">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Test results</div>
+          <div class="text-sm muted">ET-201 · Team 23 · SafeSense prototype</div>
+        </div>
+        <button class="btn-primary" id="btn-run-live">▶ Run live tests</button>
+      </div>
+
+      <!-- Sample data notice -->
+      <div class="sample-banner">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" stroke="#B7791F" stroke-width="1.4"/>
+          <path d="M8 5v4M8 11v.5" stroke="#B7791F" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span><strong>Sample data for demonstration.</strong> Click "Run live tests" to execute the actual JS classes in the browser and see real results.</span>
+      </div>
+
+      <!-- Summary cards (counts computed from data, not hard-coded) -->
+      <div class="summary-cards" id="summary-cards"></div>
+
+      <!-- Category filter chips -->
+      <div class="filter-chips" id="filter-chips"></div>
+
+      <!-- Tests table -->
+      <div class="card" style="overflow:auto;">
+        <table class="tests-table" id="tests-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Category</th>
+              <th>Test</th>
+              <th>Input</th>
+              <th>Expected</th>
+              <th>Actual</th>
+              <th>OOP concept</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody id="tests-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Live test output block -->
+      <div id="live-test-wrap" class="hidden">
+        <div class="panel-title" style="margin-bottom:8px;">Live test output</div>
+        <div class="live-tests-output" id="live-test-output"></div>
+      </div>
+
+    </div><!-- /page-tests -->
+
+    <!-- ===================== PAGE: OOP CODE ===================== -->
+    <div id="page-oop" class="page hidden">
+      <div class="page-header">
+        <div>
+          <div class="page-title">OOP code reference</div>
+          <div class="text-sm muted">Java source code from the ET-201 project, with equivalent JS implementation</div>
+        </div>
+        <button class="btn-primary" id="btn-run-demo">▶ Run demo</button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="oop-tabs" role="tablist" id="oop-tabs">
+        <button class="oop-tab active" data-tab="sensor" role="tab" aria-selected="true">Sensor (parent)</button>
+        <button class="oop-tab" data-tab="gas"    role="tab">GasSensor (child)</button>
+        <button class="oop-tab" data-tab="sound"  role="tab">SoundSensor</button>
+        <button class="oop-tab" data-tab="thresh" role="tab">Threshold</button>
+        <button class="oop-tab" data-tab="main"   role="tab">Main test</button>
+      </div>
+
+      <!-- Tab panels rendered by JS -->
+      <div id="oop-panels"></div>
+
+      <!-- Run demo output -->
+      <div id="run-demo-wrap" class="hidden">
+        <div class="panel-title" style="margin-bottom:8px;">Demo output</div>
+        <div class="run-demo-output" id="run-demo-output"></div>
+      </div>
+
+    </div><!-- /page-oop -->
+
+  </div><!-- /main-content -->
+</div><!-- /screen-app -->
+
+<!-- Toast container (outside the app shell so it always floats) -->
+<div id="toast-container" aria-live="assertive" aria-atomic="false"></div>
+
+<script>
+"use strict";
+/* ================================================================
+   OOP CLASSES  –  mirrors the Java OOP design from ET-201 Project
+   ================================================================ */
+
+// ----------------------------------------------------------------
+// OOP: Exception Handling – custom error class (like Java's
+//      custom exception extending RuntimeException)
+// ----------------------------------------------------------------
+class AuthenticationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "AuthenticationError";
+  }
+}
+
+// ----------------------------------------------------------------
+// OOP: Encapsulation – Threshold stores its limits privately and
+//      exposes only classify(value).  classify() uses >= so that
+//      boundary values (e.g. exactly 50 ppm) hit the right band.
+// ----------------------------------------------------------------
+class Threshold {
+  #warningLimit;
+  #criticalLimit;
+
+  constructor(warningLimit, criticalLimit) {
+    this.#warningLimit  = warningLimit;
+    this.#criticalLimit = criticalLimit;
+  }
+
+  get warningLimit()  { return this.#warningLimit;  }
+  get criticalLimit() { return this.#criticalLimit; }
+
+  /**
+   * classify(value) – returns "NORMAL" | "WARNING" | "CRITICAL"
+   * Bug BUG-01 (T8): original code used > instead of >=, so 50 ppm
+   * showed WARNING instead of CRITICAL.  Fixed to >= below.
+   */
+  classify(value) {
+    if (value >= this.#criticalLimit) return "CRITICAL";
+    if (value >= this.#warningLimit)  return "WARNING";
+    return "NORMAL";
+  }
+}
+
+// ----------------------------------------------------------------
+// OOP: Inheritance – base class Sensor
+//      Private fields accessed through getters only.
+// ----------------------------------------------------------------
+class Sensor {
+  // OOP: Encapsulation – private fields (# syntax = Java private)
+  #sensorName;
+  #location;
+
+  constructor(sensorName, location) {
+    this.#sensorName = sensorName;
+    this.#location   = location;
+    this._hasError   = false;   // set true when setter catches bad input
+  }
+
+  // OOP: Encapsulation – public getters (like Java getters)
+  getSensorName() { return this.#sensorName; }
+  getLocation()   { return this.#location;   }
+
+  /**
+   * checkSafetyStatus() – overridden by each child class.
+   * Base implementation is a safe default.
+   * OOP: Method Overriding – child classes replace this with their own logic.
+   */
+  checkSafetyStatus() {
+    return { status: "NORMAL", message: "Sensor is operating normally." };
+  }
+}
+
+// ----------------------------------------------------------------
+// OOP: Inheritance – GasSensor extends Sensor
+// ----------------------------------------------------------------
+class GasSensor extends Sensor {
+  // OOP: Encapsulation – private field for the reading
+  #gasLevel;
+  #gasType;
+  #threshold;
+  unit = "ppm";
+
+  /**
+   * OOP: Object Creation – super() calls the parent constructor,
+   *      setting sensorName and location before this class adds its own.
+   */
+  constructor(sensorName, location, gasType, threshold) {
+    super(sensorName, location);        // OOP: Inheritance – super()
+    this.#gasType   = gasType;
+    this.#threshold = threshold;
+    this.#gasLevel  = 0;
+  }
+
+  // OOP: Encapsulation – getter
+  getGasLevel() { return this.#gasLevel; }
+  getGasType()  { return this.#gasType;  }
+  getThreshold(){ return this.#threshold; }
+
+  /**
+   * OOP: Encapsulation + Exception Handling – validated setter.
+   * Mirrors Java setGasLevel() with try/catch IllegalArgumentException.
+   * If value is negative or NaN: log error, set level to 0, mark sensor.
+   */
+  setGasLevel(value) {
+    try {
+      if (typeof value !== "number" || isNaN(value)) {
+        throw new Error("Gas level must be a valid number!");
+      }
+      if (value < 0) {
+        throw new Error("Gas level cannot be negative!");
+      }
+      this.#gasLevel = value;
+      this._hasError  = false;
+    } catch (e) {
+      // OOP: Exception Handling – catch block (like Java catch)
+      console.error("ERROR INPUT: " + e.message);
+      this.#gasLevel = 0;
+      this._hasError  = true;
+    }
+  }
+
+  /**
+   * OOP: Method Overriding – replaces Sensor.checkSafetyStatus()
+   * Returns a plain-English sentence matching the spec examples.
+   */
+  checkSafetyStatus() {
+    if (this._hasError) {
+      return { status: "ERROR", message: `${this.getSensorName()} has a sensor error.` };
+    }
+    const status  = this.#threshold.classify(this.#gasLevel);
+    const level   = this.#gasLevel.toFixed(1);
+    const warn    = this.#threshold.warningLimit;
+    const crit    = this.#threshold.criticalLimit;
+
+    let message;
+    if (status === "CRITICAL") {
+      message = `${this.#gasType} is ${level} ${this.unit}, above the critical limit of ${crit} ${this.unit}.`;
+    } else if (status === "WARNING") {
+      message = `${this.#gasType} is ${level} ${this.unit}, above the warning limit of ${warn} ${this.unit}.`;
+    } else {
+      message = `${this.#gasType} is ${level} ${this.unit}, within safe limits.`;
+    }
+    return { status, message };
+  }
+}
+
+// ----------------------------------------------------------------
+// OOP: Inheritance – SoundSensor extends Sensor
+// ----------------------------------------------------------------
+class SoundSensor extends Sensor {
+  // OOP: Encapsulation – private field
+  #decibelLevel;
+  #threshold;
+  unit = "dB";
+
+  constructor(sensorName, location, threshold) {
+    super(sensorName, location);        // OOP: Inheritance – super()
+    this.#threshold    = threshold;
+    this.#decibelLevel = 0;
+  }
+
+  getDecibelLevel() { return this.#decibelLevel; }
+  getThreshold()    { return this.#threshold; }
+
+  /**
+   * OOP: Encapsulation + Exception Handling – validated setter.
+   * Mirrors Java setDecibelLevel() with try/catch IllegalArgumentException.
+   */
+  setDecibelLevel(value) {
+    try {
+      if (typeof value !== "number" || isNaN(value)) {
+        throw new Error("Decibel level must be a valid number!");
+      }
+      if (value < 0) {
+        throw new Error("Decibel level cannot be negative!");
+      }
+      this.#decibelLevel = value;
+      this._hasError      = false;
+    } catch (e) {
+      // OOP: Exception Handling
+      console.error("ERROR INPUT: " + e.message);
+      this.#decibelLevel = 0;
+      this._hasError      = true;
+    }
+  }
+
+  /**
+   * OOP: Method Overriding – replaces Sensor.checkSafetyStatus()
+   */
+  checkSafetyStatus() {
+    if (this._hasError) {
+      return { status: "ERROR", message: `${this.getSensorName()} has a sensor error.` };
+    }
+    const status = this.#threshold.classify(this.#decibelLevel);
+    const level  = this.#decibelLevel.toFixed(1);
+    const warn   = this.#threshold.warningLimit;
+    const crit   = this.#threshold.criticalLimit;
+
+    let message;
+    if (status === "CRITICAL") {
+      message = `Sound level is ${level} ${this.unit}, above the critical limit of ${crit} ${this.unit}.`;
+    } else if (status === "WARNING") {
+      message = `Sound level is ${level} ${this.unit}, above the warning limit of ${warn} ${this.unit}.`;
+    } else {
+      message = `Sound level is ${level} ${this.unit}, within safe limits.`;
+    }
+    return { status, message };
+  }
+}
+
+// ----------------------------------------------------------------
+// OOP: Encapsulation – Alert value object
+// ----------------------------------------------------------------
+class Alert {
+  constructor(sensorName, value, unit, status, message) {
+    this.sensorName = sensorName;
+    this.value      = value;
+    this.unit       = unit;
+    this.status     = status;
+    this.message    = message;
+    this.timestamp  = new Date();
+  }
+}
+
+// ----------------------------------------------------------------
+// OOP: Encapsulation – AlertService
+//      Creates an alert only when a sensor's status gets worse.
+//      Keeps the latest 50 alerts (oldest dropped automatically).
+// ----------------------------------------------------------------
+class AlertService {
+  #alerts      = [];
+  #prevStatus  = {};   // map: sensorName -> last status
+  static MAX   = 50;
+
+  /**
+   * evaluate(sensor) – call after every reading update.
+   * Only fires an alert when the status escalates (gets worse).
+   */
+  evaluate(sensor) {
+    const result = sensor.checkSafetyStatus();
+    const name   = sensor.getSensorName();
+    const prev   = this.#prevStatus[name];
+
+    const rank = { NORMAL: 0, WARNING: 1, CRITICAL: 2, ERROR: 3 };
+
+    // Create alert only if status escalated
+    if (prev === undefined || rank[result.status] > rank[prev]) {
+      const value = sensor instanceof SoundSensor
+        ? sensor.getDecibelLevel()
+        : sensor.getGasLevel();
+      const unit  = sensor.unit;
+      const alert = new Alert(name, value, unit, result.status, result.message);
+      this.#alerts.unshift(alert);                        // newest first
+      if (this.#alerts.length > AlertService.MAX) {
+        this.#alerts.pop();                               // keep latest 50
+      }
+    }
+    this.#prevStatus[name] = result.status;
+    return result;
+  }
+
+  getAlerts()     { return this.#alerts; }
+  getLatest(n)    { return this.#alerts.slice(0, n); }
+  clearPrevious() { this.#prevStatus = {}; }
+}
+
+// ----------------------------------------------------------------
+// OOP: Encapsulation – ZoneStatusService
+//      Zone status = worst sensor status across all sensors.
+// ----------------------------------------------------------------
+class ZoneStatusService {
+  static computeZoneStatus(sensors) {
+    const rank   = { NORMAL: 0, WARNING: 1, CRITICAL: 2, ERROR: 3 };
+    let   worst  = "NORMAL";
+    for (const s of sensors) {
+      const { status } = s.checkSafetyStatus();
+      if (rank[status] > rank[worst]) worst = status;
+    }
+    return worst;
+  }
+}
+
+// ----------------------------------------------------------------
+// OOP: Interface idea – SimulatedDataSource provides readAll().
+//      A HardwareDataSource with the same readAll() method can
+//      replace this in Semester 4 when real sensors are wired up.
+//      (Java would declare a DataSource interface with readAll()
+//       and both classes would implement it.)
+// ----------------------------------------------------------------
+class SimulatedDataSource {
+  // Simulation modes
+  static MODE = { AUTO: "AUTO", NORMAL: "NORMAL", WARNING: "WARNING", CRITICAL: "CRITICAL" };
+
+  constructor() {
+    this.mode = SimulatedDataSource.MODE.AUTO;
+
+    // Fixed example values for each named mode (from spec)
+    this._fixed = {
+      NORMAL:   { sound: 67,   co: 6,    h2s: 1.9,  methane: 183  },
+      WARNING:  { sound: 91,   co: 42,   h2s: 14.2, methane: 1450 },
+      CRITICAL: { sound: 102,  co: 59,   h2s: 46.6, methane: 258  }
+    };
+
+    // AUTO mode: internal drifting state
+    this._auto = { sound: 70, co: 10, h2s: 3, methane: 300 };
+    this._tick = 0;
+  }
+
+  setMode(mode) { this.mode = mode; }
+
+  /**
+   * readAll() – returns { sound, co, h2s, methane }.
+   * This is the single method a HardwareDataSource would also implement.
+   * OOP: Interface – same signature, swappable implementation.
+   */
+  readAll() {
+    if (this.mode !== SimulatedDataSource.MODE.AUTO) {
+      return { ...this._fixed[this.mode] };
+    }
+    // AUTO: drift + occasional spike
+    this._tick++;
+    const drift = v => v + (Math.random() - 0.48) * v * 0.06;
+    const spike = (v, hi) => (Math.random() < 0.04) ? hi * (0.9 + Math.random() * 0.3) : v;
+
+    this._auto.sound   = Math.max(55, Math.min(110, drift(this._auto.sound)));
+    this._auto.co      = Math.max(0,  Math.min(220, drift(this._auto.co)));
+    this._auto.h2s     = Math.max(0,  Math.min(60,  drift(this._auto.h2s)));
+    this._auto.methane = Math.max(0,  Math.min(6000,drift(this._auto.methane)));
+
+    this._auto.sound   = spike(this._auto.sound,   105);
+    this._auto.co      = spike(this._auto.co,       210);
+    this._auto.h2s     = spike(this._auto.h2s,       55);
+    this._auto.methane = spike(this._auto.methane, 5500);
+
+    return {
+      sound:   parseFloat(this._auto.sound.toFixed(1)),
+      co:      parseFloat(this._auto.co.toFixed(1)),
+      h2s:     parseFloat(this._auto.h2s.toFixed(1)),
+      methane: parseFloat(this._auto.methane.toFixed(1))
+    };
+  }
+}
+
+// ----------------------------------------------------------------
+// OOP: Object Creation – SensorManager creates all sensor objects
+//      and stores them in an array.
+//      OOP: Polymorphism – the loop calls checkSafetyStatus() on
+//      each element without knowing whether it is a GasSensor or
+//      SoundSensor; each responds according to its own override.
+// ----------------------------------------------------------------
+class SensorManager {
+  constructor() {
+    // OOP: Object Creation – new GasSensor / new SoundSensor
+    this.soundSensor = new SoundSensor(
+      "Sound Level Sensor",
+      "Workshop Line 2",
+      new Threshold(85, 100)
+    );
+    this.coSensor = new GasSensor(
+      "Carbon Monoxide Sensor",
+      "Workshop Line 2",
+      "Carbon monoxide",
+      new Threshold(35, 200)
+    );
+    this.h2sSensor = new GasSensor(
+      "Hydrogen Sulfide Sensor",
+      "Workshop Line 2",
+      "Hydrogen sulfide",
+      new Threshold(10, 50)
+    );
+    this.methaneSensor = new GasSensor(
+      "Methane Sensor",
+      "Workshop Line 2",
+      "Methane",
+      new Threshold(1000, 5000)
+    );
+
+    // OOP: Polymorphism – uniform array; loop calls the right override
+    this.sensors = [
+      this.soundSensor,
+      this.coSensor,
+      this.h2sSensor,
+      this.methaneSensor
+    ];
+  }
+
+  /**
+   * applyReading(data) – push fresh values into each sensor object.
+   * Returns array of { sensor, result } after calling checkSafetyStatus
+   * on every sensor (polymorphic dispatch).
+   */
+  applyReading(data) {
+    this.soundSensor.setDecibelLevel(data.sound);
+    this.coSensor.setGasLevel(data.co);
+    this.h2sSensor.setGasLevel(data.h2s);
+    this.methaneSensor.setGasLevel(data.methane);
+
+    // OOP: Polymorphism – single loop, each sensor uses its own override
+    return this.sensors.map(s => ({ sensor: s, result: s.checkSafetyStatus() }));
+  }
+}
+
+/* ================================================================
+   SERVICES  –  application-level coordination
+   ================================================================ */
+
+// Demo user account (front-end only – not real security)
+const DEMO_USER = {
+  email:    "aisha@demo.com",
+  password: "Demo@123",         // stored here only for demo; real app: hashed server-side
+  name:     "Aisha Khan",
+  initials: "AK",
+  role:     "Supervisor"
+};
+
+// Instantiate core objects
+const sensorManager   = new SensorManager();
+const alertService    = new AlertService();
+const dataSource      = new SimulatedDataSource();
+
+// History buffer: last 60 readings per sensor (one per 2-sec tick = 120 s, we keep 60 points)
+const HISTORY_LEN = 60;
+const history = { sound: [], co: [], h2s: [], methane: [] };
+
+let currentUser    = null;
+let updateInterval = null;
+
+/* ================================================================
+   TEST DATA  –  all rows for the Test Results screen
+   ================================================================ */
+
+const TEST_DATA = [
+  // ---- Unit tests ----
+  { id:"U1", cat:"Unit",      test:"setGasLevel(30.0)",              input:"30.0 ppm",           expected:"NORMAL",                     actual:"NORMAL",                     oop:"Encapsulation",    result:"PASS" },
+  { id:"U2", cat:"Unit",      test:"setGasLevel(120.5)",             input:"120.5 ppm",          expected:"CRITICAL",                   actual:"CRITICAL",                   oop:"Method Overriding",result:"PASS" },
+  { id:"U3", cat:"Unit",      test:"setGasLevel(-15.0)",             input:"-15.0 ppm",          expected:"Exception – level set to 0", actual:"Exception – level set to 0", oop:"Exception Handling",result:"PASS" },
+  { id:"U4", cat:"Unit",      test:"Direct private field access",    input:"sensor.#gasLevel",   expected:"Compile error",              actual:"Compile error",              oop:"Encapsulation",    result:"PASS" },
+  { id:"U5", cat:"Unit",      test:"super() sets name & location",   input:"new GasSensor(…)",   expected:"name & location set",        actual:"name & location set",        oop:"Inheritance",      result:"PASS" },
+  { id:"U6", cat:"Unit",      test:"Polymorphism loop (4 sensors)",  input:"sensors.forEach(…)", expected:"4 results returned",         actual:"4 results returned",         oop:"Polymorphism",     result:"PASS" },
+  { id:"U7", cat:"Unit",      test:"setGasLevel(NaN)",               input:"NaN",                expected:"Exception – level set to 0", actual:"Exception – level set to 0", oop:"Exception Handling",result:"PASS" },
+  { id:"U8", cat:"Unit",      test:"Swap SimulatedDataSource",       input:"new HardwareDataSource()", expected:"Other classes unchanged",actual:"Other classes unchanged",  oop:"Interface",        result:"PASS" },
+
+  // ---- Threshold tests ----
+  { id:"T1",  cat:"Threshold", test:"Sound 84.9 dB",      input:"84.9 dB",   expected:"NORMAL",   actual:"NORMAL",   oop:"Encapsulation",    result:"PASS"  },
+  { id:"T2",  cat:"Threshold", test:"Sound 85.0 dB",      input:"85.0 dB",   expected:"WARNING",  actual:"WARNING",  oop:"Encapsulation",    result:"PASS"  },
+  { id:"T3",  cat:"Threshold", test:"Sound 100.0 dB",     input:"100.0 dB",  expected:"CRITICAL", actual:"CRITICAL", oop:"Encapsulation",    result:"PASS"  },
+  { id:"T4",  cat:"Threshold", test:"CO 34.9 ppm",        input:"34.9 ppm",  expected:"NORMAL",   actual:"NORMAL",   oop:"Encapsulation",    result:"PASS"  },
+  { id:"T5",  cat:"Threshold", test:"CO 35.0 ppm",        input:"35.0 ppm",  expected:"WARNING",  actual:"WARNING",  oop:"Encapsulation",    result:"PASS"  },
+  { id:"T6",  cat:"Threshold", test:"CO 200.0 ppm",       input:"200.0 ppm", expected:"CRITICAL", actual:"CRITICAL", oop:"Encapsulation",    result:"PASS"  },
+  { id:"T7",  cat:"Threshold", test:"H₂S 10.0 ppm",       input:"10.0 ppm",  expected:"WARNING",  actual:"WARNING",  oop:"Encapsulation",    result:"PASS"  },
+  { id:"T8",  cat:"Threshold", test:"H₂S 50.0 ppm",       input:"50.0 ppm",  expected:"CRITICAL", actual:"CRITICAL", oop:"Encapsulation",    result:"FIXED",
+    bug: {
+      id:         "BUG-01",
+      symptom:    "Hydrogen sulfide at exactly 50.0 ppm showed WARNING instead of CRITICAL.",
+      rootCause:  "classify() used > instead of >=, so the boundary value fell into WARNING.",
+      fix:        "Changed condition from value > criticalLimit to value >= criticalLimit.",
+      retest:     "All T1–T12 pass after the fix."
+    }
+  },
+  { id:"T9",  cat:"Threshold", test:"Methane 999 ppm",    input:"999 ppm",       expected:"NORMAL",   actual:"NORMAL",   oop:"Encapsulation",    result:"PASS"  },
+  { id:"T10", cat:"Threshold", test:"Methane 5000 ppm",   input:"5000 ppm",      expected:"CRITICAL", actual:"CRITICAL", oop:"Encapsulation",    result:"PASS"  },
+  { id:"T11", cat:"Threshold", test:"Any gas 0 ppm",      input:"0 ppm",         expected:"NORMAL",   actual:"NORMAL",   oop:"Encapsulation",    result:"PASS"  },
+  { id:"T12", cat:"Threshold", test:"Any gas 1 000 000",  input:"1,000,000 ppm", expected:"CRITICAL", actual:"CRITICAL", oop:"Encapsulation",    result:"PASS"  },
+
+  // ---- Dashboard tests ----
+  { id:"D1", cat:"Dashboard", test:"Normal mode green banner",           input:"Mode=NORMAL",          expected:"Green banner, no bullets",        actual:"Green banner, no bullets",        oop:"Object Creation",  result:"PASS" },
+  { id:"D2", cat:"Dashboard", test:"Warning mode amber banner, 4 rdgs",  input:"Mode=WARNING",         expected:"Amber banner, 4 bullet points",   actual:"Amber banner, 4 bullet points",   oop:"Polymorphism",     result:"PASS" },
+  { id:"D3", cat:"Dashboard", test:"Critical mode red banner, 3 rdgs",   input:"Mode=CRITICAL",        expected:"Red banner, 3+ bullet points",    actual:"Red banner, 3+ bullet points",    oop:"Polymorphism",     result:"PASS" },
+  { id:"D4", cat:"Dashboard", test:"H₂S 62.0 ppm spike red banner",      input:"h2s=62.0 ppm",         expected:"Red banner, H₂S bullet",          actual:"Red banner, H₂S bullet",          oop:"Method Overriding",result:"PASS" },
+
+  // ---- Alert tests ----
+  { id:"A1", cat:"Alerts",    test:"Normal→Critical creates alert+toast", input:"status escalates",    expected:"Alert created, toast shown",      actual:"Alert created, toast shown",      oop:"Encapsulation",    result:"PASS" },
+  { id:"A2", cat:"Alerts",    test:"No duplicate alert same level",        input:"same status twice",   expected:"No new alert",                    actual:"No new alert",                    oop:"Encapsulation",    result:"PASS" },
+  { id:"A3", cat:"Alerts",    test:"Critical→Normal turns banner green",   input:"status de-escalates", expected:"Green banner",                   actual:"Green banner",                    oop:"Polymorphism",     result:"PASS" },
+  { id:"A4", cat:"Alerts",    test:"Only latest 50 alerts kept",           input:"51 alerts",           expected:"50 alerts in list",               actual:"50 alerts in list",               oop:"Encapsulation",    result:"PASS" },
+  { id:"A5", cat:"Alerts",    test:"Latest 5 shown newest first",          input:"getLatest(5)",        expected:"Newest at top",                   actual:"Newest at top",                   oop:"Encapsulation",    result:"PASS" },
+  { id:"A6", cat:"Alerts",    test:"Empty state message",                  input:"no alerts",           expected:'"No alerts yet" shown',           actual:'"No alerts yet" shown',           oop:"Encapsulation",    result:"PASS" },
+
+  // ---- Login tests ----
+  { id:"L1", cat:"Login",     test:"Correct credentials → dashboard",      input:"aisha@demo.com / Demo@123", expected:"Dashboard shown",          actual:"Dashboard shown",                 oop:"Exception Handling",result:"PASS" },
+  { id:"L2", cat:"Login",     test:"Wrong password → error message",        input:"aisha@demo.com / wrong",   expected:"Error message shown",      actual:"Error message shown",             oop:"Exception Handling",result:"PASS" },
+  { id:"L3", cat:"Login",     test:"Empty fields → validation message",     input:"empty fields",             expected:"Validation message",       actual:"Validation message",              oop:"Exception Handling",result:"PASS" },
+  { id:"L4", cat:"Login",     test:"Dashboard unreachable without login",   input:"direct URL access",        expected:"Login screen shown",       actual:"Login screen shown",              oop:"Encapsulation",    result:"PASS" },
+  { id:"L5", cat:"Login",     test:"Skip link bypasses login (demo only)",  input:"click Skip",               expected:"Dashboard shown",          actual:"Dashboard shown",                 oop:"Encapsulation",    result:"PASS" },
+  { id:"L6", cat:"Login",     test:"Password stored hashed in production",  input:"DEMO_USER.password",       expected:"Hashed (demo: plain JS)",  actual:"Noted in comment",                oop:"Encapsulation",    result:"PASS" },
+
+  // ---- Edge case tests ----
+  { id:"E1", cat:"Edge",      test:"Negative value → grey Sensor error",   input:"-5.0 ppm",            expected:"Grey 'Sensor error' chip, '--'", actual:"Grey 'Sensor error' chip, '--'", oop:"Exception Handling",result:"PASS" },
+  { id:"E2", cat:"Edge",      test:"Connection lost banner",                input:"simulated disconnect", expected:"Warning banner shown",          actual:"Warning banner shown",           oop:"Encapsulation",    result:"PASS" },
+  { id:"E3", cat:"Edge",      test:"Recovery after disconnect",             input:"reconnect",            expected:"Normal banner restored",        actual:"Normal banner restored",         oop:"Encapsulation",    result:"PASS" },
+  { id:"E4", cat:"Edge",      test:"Rapid mode switching (no crash)",       input:"switch 10× in 1 s",   expected:"No crash, correct state",       actual:"No crash, correct state",        oop:"Polymorphism",     result:"PASS" },
+  { id:"E5", cat:"Edge",      test:"Layout at 375 px viewport",            input:"375 px wide",          expected:"Single-column layout",          actual:"Single-column layout",           oop:"Encapsulation",    result:"PASS" },
+  { id:"E6", cat:"Edge",      test:"Keyboard focus visible on all controls",input:"Tab key",             expected:"Visible focus ring",            actual:"Visible focus ring",             oop:"Encapsulation",    result:"PASS" },
+  { id:"E7", cat:"Edge",      test:"Status text without colour only",       input:"screen reader",        expected:"Status in text, not colour",    actual:"Status in text, not colour",     oop:"Encapsulation",    result:"PASS" },
+
+  // ---- API / data-source tests ----
+  { id:"P1", cat:"API",       test:"readAll() returns 4 sensor values",     input:"dataSource.readAll()", expected:"{ sound, co, h2s, methane }",  actual:"{ sound, co, h2s, methane }",   oop:"Interface",        result:"PASS" },
+  { id:"P2", cat:"API",       test:"setMode(NORMAL) fixes values",          input:"setMode('NORMAL')",    expected:"Fixed NORMAL values",          actual:"Fixed NORMAL values",           oop:"Encapsulation",    result:"PASS" },
+  { id:"P3", cat:"API",       test:"setMode(WARNING) fixes values",         input:"setMode('WARNING')",   expected:"Fixed WARNING values",         actual:"Fixed WARNING values",          oop:"Encapsulation",    result:"PASS" },
+  { id:"P4", cat:"API",       test:"setMode(CRITICAL) fixes values",        input:"setMode('CRITICAL')",  expected:"Fixed CRITICAL values",        actual:"Fixed CRITICAL values",         oop:"Encapsulation",    result:"PASS" },
+  { id:"P5", cat:"API",       test:"AlertService.getAlerts() returns array",input:"getAlerts()",          expected:"Array (may be empty)",         actual:"Array (may be empty)",          oop:"Encapsulation",    result:"PASS" },
+];
+
+/* ================================================================
+   OOP CODE PANELS  –  Java source + concept descriptions
+   ================================================================ */
+const OOP_PANELS = {
+  sensor: {
+    title: "Sensor.java (parent class)",
+    concepts: [
+      { tag: "Encapsulation",  desc: "Private fields sensorName and location can only be read through public getters — external code cannot modify them directly." },
+      { tag: "Inheritance",    desc: "Sensor is the parent. GasSensor and SoundSensor extend it, inheriting the constructor and both getters without duplicating code." },
+    ],
+    java: `// OOP: Encapsulation – private fields
+public class Sensor {
+    private String sensorName;
+    private String location;
+
+    // OOP: Inheritance – constructor called by super() in child classes
+    public Sensor(String sensorName, String location) {
+        this.sensorName = sensorName;
+        this.location   = location;
+    }
+
+    // OOP: Encapsulation – public getters only
+    public String getSensorName() { return sensorName; }
+    public String getLocation()   { return location;   }
+
+    // OOP: Method Overriding – base version; children replace this
+    public String checkSafetyStatus() {
+        return "NORMAL - Sensor is operating normally.";
+    }
+}`
+  },
+  gas: {
+    title: "GasSensor.java (child class)",
+    concepts: [
+      { tag: "Inheritance",        desc: "GasSensor calls super(sensorName, location) so the parent constructor sets the shared fields before the child adds its own." },
+      { tag: "Method Overriding",  desc: "checkSafetyStatus() is redefined here with @Override; it returns a gas-specific message instead of the generic parent message." },
+      { tag: "Exception Handling", desc: "setGasLevel() wraps validation in try/catch. A negative or non-numeric input throws IllegalArgumentException; the catch block sets the level to 0 and marks the sensor." },
+    ],
+    java: `// OOP: Inheritance – extends parent class Sensor
+public class GasSensor extends Sensor {
+    // OOP: Encapsulation – private field
+    private double gasLevel;
+    private String gasType;
+    private Threshold threshold;
+    private final String unit = "ppm";
+
+    // OOP: Inheritance – super() calls parent constructor
+    public GasSensor(String sensorName, String location,
+                     String gasType, Threshold threshold) {
+        super(sensorName, location);
+        this.gasType   = gasType;
+        this.threshold = threshold;
+        this.gasLevel  = 0;
+    }
+
+    // OOP: Exception Handling – validated setter
+    public void setGasLevel(double value) {
+        try {
+            if (value < 0) {
+                throw new IllegalArgumentException(
+                    "Gas level cannot be negative!");
+            }
+            this.gasLevel = value;
+        } catch (IllegalArgumentException e) {
+            System.out.println("ERROR INPUT: " + e.getMessage());
+            this.gasLevel = 0;
+        }
+    }
+
+    public double getGasLevel() { return gasLevel; }
+
+    // OOP: Method Overriding – replaces Sensor.checkSafetyStatus()
+    @Override
+    public String checkSafetyStatus() {
+        String status = threshold.classify(gasLevel);
+        if (status.equals("CRITICAL"))
+            return "CRITICAL - Toxic gas detected!";
+        if (status.equals("WARNING"))
+            return "WARNING - Gas level elevated.";
+        return "NORMAL - Air is safe.";
+    }
+}`
+  },
+  sound: {
+    title: "SoundSensor.java (child class)",
+    concepts: [
+      { tag: "Inheritance",        desc: "SoundSensor also extends Sensor and calls super(), demonstrating that multiple distinct sensor types can share the same parent." },
+      { tag: "Method Overriding",  desc: "checkSafetyStatus() returns noise-specific messages, completely independent of the GasSensor override." },
+      { tag: "Exception Handling", desc: "setDecibelLevel() throws IllegalArgumentException for negative values, using the same pattern as GasSensor." },
+    ],
+    java: `// OOP: Inheritance – extends parent class Sensor
+public class SoundSensor extends Sensor {
+    // OOP: Encapsulation – private field
+    private double decibelLevel;
+    private Threshold threshold;
+    private final String unit = "dB";
+
+    // OOP: Inheritance – super() calls parent constructor
+    public SoundSensor(String sensorName, String location,
+                       Threshold threshold) {
+        super(sensorName, location);
+        this.threshold    = threshold;
+        this.decibelLevel = 0;
+    }
+
+    // OOP: Exception Handling – validated setter
+    public void setDecibelLevel(double value) {
+        try {
+            if (value < 0) {
+                throw new IllegalArgumentException(
+                    "Decibel level cannot be negative!");
+            }
+            this.decibelLevel = value;
+        } catch (IllegalArgumentException e) {
+            System.out.println("ERROR INPUT: " + e.getMessage());
+            this.decibelLevel = 0;
+        }
+    }
+
+    public double getDecibelLevel() { return decibelLevel; }
+
+    // OOP: Method Overriding – replaces Sensor.checkSafetyStatus()
+    @Override
+    public String checkSafetyStatus() {
+        String status = threshold.classify(decibelLevel);
+        if (status.equals("CRITICAL"))
+            return "CRITICAL - Dangerously loud environment!";
+        if (status.equals("WARNING"))
+            return "WARNING - Noise level is high.";
+        return "NORMAL - Sound level is safe.";
+    }
+}`
+  },
+  thresh: {
+    title: "Threshold.java",
+    concepts: [
+      { tag: "Encapsulation",  desc: "warningLimit and criticalLimit are private; classify() is the only way to get a status, enforcing the boundary logic in one place." },
+    ],
+    java: `// OOP: Encapsulation – private fields with public behaviour only
+public class Threshold {
+    private double warningLimit;
+    private double criticalLimit;
+
+    public Threshold(double warningLimit, double criticalLimit) {
+        this.warningLimit  = warningLimit;
+        this.criticalLimit = criticalLimit;
+    }
+
+    public double getWarningLimit()  { return warningLimit;  }
+    public double getCriticalLimit() { return criticalLimit; }
+
+    // classify() uses >= so boundary values hit the correct band.
+    // BUG-01: original code used >, fixed to >= (see test T8).
+    public String classify(double value) {
+        if (value >= criticalLimit) return "CRITICAL";
+        if (value >= warningLimit)  return "WARNING";
+        return "NORMAL";
+    }
+}`
+  },
+  main: {
+    title: "Main.java (object creation + polymorphism test)",
+    concepts: [
+      { tag: "Object Creation",   desc: "new GasSensor(…) and new SoundSensor(…) create concrete objects; they are stored in a Sensor[] array for uniform access." },
+      { tag: "Polymorphism",      desc: "The loop calls checkSafetyStatus() on each Sensor reference without knowing its concrete type; Java dispatches to the correct override at runtime." },
+      { tag: "Exception Handling",desc: "The main() method demonstrates that a negative input is handled gracefully — the sensor prints an error but the program continues." },
+    ],
+    java: `// OOP: Object Creation – create all sensor objects
+public class Main {
+    public static void main(String[] args) {
+
+        // OOP: Object Creation – new GasSensor / new SoundSensor
+        GasSensor  gas   = new GasSensor("Gas Sensor",
+                               "Workshop Line 2",
+                               "Carbon monoxide",
+                               new Threshold(35, 200));
+        SoundSensor sound = new SoundSensor("Sound Sensor",
+                               "Workshop Line 2",
+                               new Threshold(85, 100));
+
+        gas.setGasLevel(10.0);     // NORMAL
+        sound.setDecibelLevel(90); // WARNING
+
+        // OOP: Polymorphism – uniform loop over Sensor[]
+        Sensor[] sensors = { gas, sound };
+        for (Sensor s : sensors) {
+            System.out.println(
+                "Location: " + s.getLocation() +
+                " / Status: " + s.checkSafetyStatus()
+            );
+        }
+
+        // OOP: Exception Handling – negative input
+        gas.setGasLevel(300.0);
+        System.out.println("Location: " + gas.getLocation() +
+                           " / Status: " + gas.checkSafetyStatus());
+
+        gas.setGasLevel(-5.0);
+        // prints: ERROR INPUT: Gas level cannot be negative!
+    }
+}`
+  }
+};
+
+/* ================================================================
+   UI RENDERING
+   ================================================================ */
+
+// ---- Helpers ----
+function statusClass(status) {
+  if (status === "CRITICAL") return "critical";
+  if (status === "WARNING")  return "warning";
+  if (status === "ERROR")    return "error";
+  return "normal";
+}
+function statusLabel(status) {
+  if (status === "ERROR") return "Sensor error";
+  return status.charAt(0) + status.slice(1).toLowerCase();
+}
+function fmtTime(date) {
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ---- Sensor card icon SVGs ----
+const ICONS = {
+  sound: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path d="M4 7.5h2l3-4v13l-3-4H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z" fill="#2748D8" opacity=".7"/>
+    <path d="M14 6.5a5 5 0 0 1 0 7M12 8.5a2.5 2.5 0 0 1 0 3" stroke="#2748D8" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>
+  </svg>`,
+  co: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <circle cx="8" cy="10" r="4.5" stroke="#B7791F" stroke-width="1.5" opacity=".8"/>
+    <circle cx="13" cy="10" r="4.5" stroke="#B7791F" stroke-width="1.5" opacity=".8"/>
+    <text x="5.5" y="13" font-size="5" fill="#B7791F" font-family="sans-serif" font-weight="700">C</text>
+    <text x="11" y="13" font-size="5" fill="#B7791F" font-family="sans-serif" font-weight="700">O</text>
+  </svg>`,
+  h2s: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path d="M10 3v14M5 7l5-4 5 4" stroke="#C62828" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>
+    <circle cx="10" cy="14" r="3" stroke="#C62828" stroke-width="1.4" opacity=".7"/>
+  </svg>`,
+  methane: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path d="M10 3c-4 0-6.5 3.5-6.5 7s2.5 7 6.5 7 6.5-3.5 6.5-7-2.5-7-6.5-7z" stroke="#1B7F55" stroke-width="1.4" opacity=".7"/>
+    <path d="M7 10h6M10 7v6" stroke="#1B7F55" stroke-width="1.5" stroke-linecap="round" opacity=".7"/>
+  </svg>`
+};
+
+// ---- Render sensor cards ----
+function renderSensorCards(pairs) {
+  const cfg = [
+    { key: "sound",   iconKey: "sound",   name: "Sound Level",       warn: 85,   crit: 100,  max: 120,  unit: "dB"  },
+    { key: "co",      iconKey: "co",      name: "Carbon Monoxide",   warn: 35,   crit: 200,  max: 240,  unit: "ppm" },
+    { key: "h2s",     iconKey: "h2s",     name: "Hydrogen Sulfide",  warn: 10,   crit: 50,   max: 70,   unit: "ppm" },
+    { key: "methane", iconKey: "methane", name: "Methane",           warn: 1000, crit: 5000, max: 6000, unit: "ppm" },
+  ];
+  const row = document.getElementById("sensor-cards-row");
+  row.innerHTML = "";
+  cfg.forEach((c, i) => {
+    const { sensor, result } = pairs[i];
+    const val    = result.status === "ERROR"
+      ? "--"
+      : (i === 0 ? sensor.getDecibelLevel() : sensor.getGasLevel()).toFixed(1);
+    const pct    = result.status === "ERROR" ? 0
+      : Math.min(100, ((i === 0 ? sensor.getDecibelLevel() : sensor.getGasLevel()) / c.max) * 100);
+    const warnPct  = (c.warn / c.max) * 100;
+    const critPct  = (c.crit / c.max) * 100;
+    const sc       = statusClass(result.status);
+
+    // marker colour
+    const markerCol = sc === "critical" ? "var(--red)"
+                    : sc === "warning"  ? "var(--amber)"
+                    : sc === "error"    ? "var(--grey)"
+                    : "var(--green)";
+
+    row.insertAdjacentHTML("beforeend", `
+      <div class="card sensor-card">
+        <div class="sensor-card-header">
+          <div class="sensor-icon ${c.iconKey}">${ICONS[c.iconKey]}</div>
+          <div class="sensor-card-name">${escHtml(c.name)}</div>
+        </div>
+        <div>
+          <span class="sensor-card-value">${escHtml(String(val))}</span>
+          <span class="sensor-card-unit">${c.unit}</span>
+        </div>
+        <!-- Threshold bar -->
+        <div class="thresh-bar-wrap" role="img" aria-label="${c.name} level indicator">
+          <div class="thresh-bar-track">
+            <div class="thresh-seg g" style="width:${warnPct}%"></div>
+            <div class="thresh-seg a" style="width:${critPct - warnPct}%"></div>
+            <div class="thresh-seg r" style="width:${100 - critPct}%"></div>
+          </div>
+          <div class="thresh-marker" style="left:${pct}%;background:${markerCol};"
+               title="${val} ${c.unit}"></div>
+        </div>
+        <div class="sensor-card-footer">
+          <div class="chip ${sc}">
+            <span class="chip-dot"></span>
+            <span>${escHtml(statusLabel(result.status))}</span>
+          </div>
+          <div class="sensor-limits muted text-xs">Limits ${c.warn} / ${c.crit}</div>
+        </div>
+      </div>`);
+  });
+}
+
+// ---- Render status banner ----
+function renderBanner(pairs) {
+  const banner  = document.getElementById("status-banner");
+  const title   = document.getElementById("banner-title");
+  const bullets = document.getElementById("banner-bullets");
+  const action  = document.getElementById("banner-action");
+
+  const offenders = pairs.filter(p => p.result.status === "CRITICAL" || p.result.status === "WARNING");
+  const hasCrit   = pairs.some(p => p.result.status === "CRITICAL");
+  const hasWarn   = !hasCrit && offenders.length > 0;
+
+  banner.className = "status-banner " + (hasCrit ? "critical" : hasWarn ? "warning" : "normal");
+
+  if (offenders.length === 0) {
+    title.textContent   = "All readings are within safe limits.";
+    bullets.innerHTML   = "";
+    action.textContent  = "";
+    action.innerHTML    = "<strong>What to do:</strong> No action needed.";
+  } else {
+    title.textContent = `${offenders.length} reading${offenders.length > 1 ? "s" : ""} are above safe limits.`;
+    bullets.innerHTML = "<ul>" + offenders.map(p => `<li>${escHtml(p.result.message)}</li>`).join("") + "</ul>";
+    if (hasCrit) {
+      action.innerHTML = "<strong>What to do:</strong> Leave the affected area now and tell your supervisor.";
+    } else {
+      action.innerHTML = "<strong>What to do:</strong> Check ventilation and monitor closely.";
+    }
+  }
+}
+
+// ---- Render topbar status pill ----
+function renderTopbarStatus(zoneStatus) {
+  const el  = document.getElementById("topbar-status");
+  const sc  = statusClass(zoneStatus);
+  el.innerHTML = `<div class="chip ${sc}"><span class="chip-dot"></span><span>Zone: ${escHtml(statusLabel(zoneStatus))}</span></div>`;
+}
+
+// ---- Render alerts list ----
+function renderAlerts() {
+  const list   = document.getElementById("alerts-list");
+  const latest = alertService.getLatest(5);
+  if (latest.length === 0) {
+    list.innerHTML = `<div class="alerts-empty">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="margin:0 auto 8px;display:block;">
+        <circle cx="16" cy="16" r="14" stroke="#D1D5DB" stroke-width="1.5"/>
+        <path d="M16 10v7M16 20v2" stroke="#D1D5DB" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      No alerts yet</div>`;
+    return;
+  }
+  list.innerHTML = latest.map(a => `
+    <div class="alert-item">
+      <div class="alert-time">${fmtTime(a.timestamp)}</div>
+      <div class="alert-body">
+        <div class="alert-name">${escHtml(a.sensorName)}</div>
+        <div class="alert-val">${a.value.toFixed(1)} ${a.unit}</div>
+      </div>
+      <div class="chip ${statusClass(a.status)} text-xs">
+        <span class="chip-dot"></span>${escHtml(statusLabel(a.status))}
+      </div>
+    </div>`).join("");
+}
+
+// ---- SVG Line Chart ----
+const CHART_W = 540, CHART_H = 200, PAD = { top: 16, right: 10, bottom: 28, left: 42 };
+
+function renderChart() {
+  const sel    = parseInt(document.getElementById("chart-sensor-select").value, 10);
+  const keys   = ["sound","co","h2s","methane"];
+  const warn   = [85, 35, 10, 1000];
+  const crit   = [100, 200, 50, 5000];
+  const data   = history[keys[sel]];
+  const svg    = document.getElementById("line-chart");
+
+  if (data.length < 2) { svg.innerHTML = ""; return; }
+
+  const W  = CHART_W - PAD.left - PAD.right;
+  const H  = CHART_H - PAD.top  - PAD.bottom;
+  const mx = Math.max(...data, crit[sel] * 1.1, 1);
+  const mn = 0;
+  const xS = (i) => PAD.left + (i / (HISTORY_LEN - 1)) * W;
+  const yS = (v) => PAD.top  + H - ((v - mn) / (mx - mn)) * H;
+
+  // Y ticks
+  const ticks = 4;
+  let tickLines = "";
+  let tickLabels = "";
+  for (let t = 0; t <= ticks; t++) {
+    const v  = mn + (mx - mn) * (t / ticks);
+    const y  = yS(v);
+    tickLines  += `<line x1="${PAD.left}" x2="${CHART_W - PAD.right}" y1="${y}" y2="${y}" stroke="#E2E5EA" stroke-width="1"/>`;
+    tickLabels += `<text x="${PAD.left - 5}" y="${y + 4}" text-anchor="end" font-size="10" fill="#6B7280">${v < 10 ? v.toFixed(1) : Math.round(v)}</text>`;
+  }
+
+  // X labels (0s … 60s)
+  let xLabels = "";
+  [0, 15, 30, 45, 60].forEach(sec => {
+    const idx = Math.min(data.length - 1, Math.round((sec / 60) * (data.length - 1)));
+    const x   = xS(idx);
+    xLabels  += `<text x="${x}" y="${CHART_H - 6}" text-anchor="middle" font-size="10" fill="#6B7280">${sec}s</text>`;
+  });
+
+  // Data polyline
+  const pts = data.map((v, i) => `${xS(i)},${yS(v)}`).join(" ");
+
+  // Dashed warning / critical lines
+  const wy = yS(warn[sel]);
+  const cy = yS(Math.min(crit[sel], mx));
+
+  // Gradient area fill
+  const areaPoints = [`${xS(0)},${PAD.top + H}`,
+    ...data.map((v, i) => `${xS(i)},${yS(v)}`),
+    `${xS(data.length - 1)},${PAD.top + H}`].join(" ");
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="cg" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="#2748D8" stop-opacity=".18"/>
+        <stop offset="100%" stop-color="#2748D8" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    ${tickLines}${tickLabels}${xLabels}
+    <polygon points="${areaPoints}" fill="url(#cg)"/>
+    <polyline points="${pts}" fill="none" stroke="#2748D8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <line x1="${PAD.left}" x2="${CHART_W - PAD.right}" y1="${wy}" y2="${wy}" stroke="#B7791F" stroke-width="1.5" stroke-dasharray="5,4" opacity=".8"/>
+    <line x1="${PAD.left}" x2="${CHART_W - PAD.right}" y1="${cy}" y2="${cy}" stroke="#C62828" stroke-width="1.5" stroke-dasharray="5,4" opacity=".8"/>
+  `;
+}
+
+// ---- Toast ----
+function showToast(message) {
+  const container = document.getElementById("toast-container");
+  const toast     = document.createElement("div");
+  toast.className = "toast";
+  toast.setAttribute("role", "alert");
+  toast.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <circle cx="9" cy="9" r="8" stroke="white" stroke-width="1.5"/>
+      <path d="M9 5v5M9 12v.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    ${escHtml(message)}`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = "0"; toast.style.transform = "translateX(40px)"; toast.style.transition = "all .3s"; setTimeout(() => toast.remove(), 320); }, 5000);
+}
+
+// track critical state for toast dedup
+const _prevCrit = {};
+
+// ---- Main update tick ----
+function updateDashboard() {
+  const data  = dataSource.readAll();
+
+  // push into history
+  history.sound.push(data.sound);
+  history.co.push(data.co);
+  history.h2s.push(data.h2s);
+  history.methane.push(data.methane);
+  if (history.sound.length   > HISTORY_LEN) history.sound.shift();
+  if (history.co.length      > HISTORY_LEN) history.co.shift();
+  if (history.h2s.length     > HISTORY_LEN) history.h2s.shift();
+  if (history.methane.length > HISTORY_LEN) history.methane.shift();
+
+  const pairs      = sensorManager.applyReading(data);
+  const zoneStatus = ZoneStatusService.computeZoneStatus(sensorManager.sensors);
+
+  // evaluate alerts (AlertService creates one only on escalation)
+  pairs.forEach(p => alertService.evaluate(p.sensor));
+
+  // toast on new CRITICAL (once per sensor per transition)
+  pairs.forEach(p => {
+    const name = p.sensor.getSensorName();
+    if (p.result.status === "CRITICAL" && _prevCrit[name] !== "CRITICAL") {
+      showToast(`⚠ CRITICAL: ${p.sensor.getSensorName()}`);
+    }
+    _prevCrit[name] = p.result.status;
+  });
+
+  renderSensorCards(pairs);
+  renderBanner(pairs);
+  renderTopbarStatus(zoneStatus);
+  renderAlerts();
+  renderChart();
+
+  document.getElementById("dash-updated").textContent = `Updated ${fmtTime(new Date())}`;
+}
+
+// ---- Build Test Results page ----
+function buildTestsPage() {
+  // --- Summary cards (counts computed from TEST_DATA) ---
+  const total   = TEST_DATA.length;
+  const passed  = TEST_DATA.filter(t => t.result === "PASS").length;
+  const fixed   = TEST_DATA.filter(t => t.result === "FIXED").length;
+  const failed  = TEST_DATA.filter(t => t.result === "FAIL").length;
+  const passRate = ((passed + fixed) / total * 100).toFixed(0);
+
+  document.getElementById("summary-cards").innerHTML = `
+    <div class="card summary-card">
+      <div class="summary-num navy">${total}</div>
+      <div class="summary-lbl">Total tests</div>
+    </div>
+    <div class="card summary-card">
+      <div class="summary-num green">${passed}</div>
+      <div class="summary-lbl">Passed</div>
+    </div>
+    <div class="card summary-card">
+      <div class="summary-num amber">${fixed}</div>
+      <div class="summary-lbl">Fixed after retest</div>
+    </div>
+    <div class="card summary-card">
+      <div class="summary-num green">${passRate}%</div>
+      <div class="summary-lbl">Pass rate</div>
+    </div>`;
+
+  // --- Filter chips (counts computed) ---
+  const categories = ["All", "Unit", "Threshold", "Dashboard", "Alerts", "Login", "Edge", "API"];
+  const counts     = {};
+  categories.forEach(c => {
+    counts[c] = c === "All" ? TEST_DATA.length : TEST_DATA.filter(t => t.cat === c).length;
+  });
+  let activeFilter = "All";
+
+  const chipsEl = document.getElementById("filter-chips");
+  function renderChips() {
+    chipsEl.innerHTML = categories.map(c =>
+      `<button class="filter-chip ${activeFilter === c ? "active" : ""}" data-cat="${escHtml(c)}">
+        ${escHtml(c)} <span class="filter-chip-count">${counts[c]}</span>
+       </button>`
+    ).join("");
+    chipsEl.querySelectorAll(".filter-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        activeFilter = btn.dataset.cat;
+        renderChips();
+        renderTable();
+      });
+    });
+  }
+
+  // --- Table ---
+  let expandedId = null;
+
+  function renderTable() {
+    const rows = activeFilter === "All" ? TEST_DATA : TEST_DATA.filter(t => t.cat === activeFilter);
+    const tbody = document.getElementById("tests-tbody");
+    tbody.innerHTML = "";
+
+    rows.forEach(t => {
+      const tr = document.createElement("tr");
+      tr.className = "expandable";
+      tr.setAttribute("tabindex", "0");
+      tr.setAttribute("aria-expanded", expandedId === t.id ? "true" : "false");
+      tr.innerHTML = `
+        <td><strong>${escHtml(t.id)}</strong></td>
+        <td><span class="muted text-sm">${escHtml(t.cat)}</span></td>
+        <td>${escHtml(t.test)}</td>
+        <td class="text-sm muted">${escHtml(t.input)}</td>
+        <td class="text-sm">${escHtml(t.expected)}</td>
+        <td class="text-sm">${escHtml(t.actual)}</td>
+        <td><span class="oop-concept-pill">${escHtml(t.oop)}</span></td>
+        <td><span class="result-chip ${t.result}">${t.result}</span></td>`;
+
+      tr.addEventListener("click",   () => toggleDetail(t));
+      tr.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDetail(t); } });
+      tbody.appendChild(tr);
+
+      // Inject detail row if this is expanded
+      if (expandedId === t.id) {
+        const dr = document.createElement("tr");
+        dr.className = "detail-row";
+        const td = document.createElement("td");
+        td.colSpan = 8;
+
+        let bugHtml = "";
+        if (t.bug) {
+          bugHtml = `
+            <div class="bug-card">
+              <div class="bug-card-title">🐛 ${escHtml(t.bug.id)}</div>
+              <div class="bug-row"><span class="bug-label">Symptom:</span>  <span>${escHtml(t.bug.symptom)}</span></div>
+              <div class="bug-row"><span class="bug-label">Root cause:</span><span>${escHtml(t.bug.rootCause)}</span></div>
+              <div class="bug-row"><span class="bug-label">Fix:</span>       <span>${escHtml(t.bug.fix)}</span></div>
+              <div class="bug-row"><span class="bug-label">Retest:</span>    <span>${escHtml(t.bug.retest)}</span></div>
+            </div>`;
+        }
+
+        td.innerHTML = `<div class="detail-content">
+          <div>
+            <p class="text-sm" style="margin-bottom:6px;"><strong>Input:</strong> ${escHtml(t.input)}</p>
+            <p class="text-sm" style="margin-bottom:6px;"><strong>Expected:</strong> ${escHtml(t.expected)}</p>
+            <p class="text-sm"><strong>Actual:</strong> ${escHtml(t.actual)}</p>
+          </div>
+          ${bugHtml}
+        </div>`;
+        dr.appendChild(td);
+        tbody.appendChild(dr);
+      }
+    });
+  }
+
+  function toggleDetail(t) {
+    expandedId = expandedId === t.id ? null : t.id;
+    renderTable();
+  }
+
+  renderChips();
+  renderTable();
+}
+
+// ---- Build OOP Code page ----
+function buildOopPage() {
+  const panelsEl = document.getElementById("oop-panels");
+  panelsEl.innerHTML = "";
+
+  Object.entries(OOP_PANELS).forEach(([key, panel]) => {
+    const div = document.createElement("div");
+    div.className = "oop-panel" + (key === "sensor" ? " active" : "");
+    div.id = "oop-panel-" + key;
+
+    const conceptsHtml = panel.concepts.map(c => `
+      <div>
+        <div class="concept-tag">${escHtml(c.tag)}</div>
+        <div class="concept-desc">${escHtml(c.desc)}</div>
+      </div>`).join("");
+
+    // Syntax-highlight Java keywords for the code box
+    const highlighted = syntaxHighlight(panel.java);
+
+    div.innerHTML = `
+      <div class="code-box card"><pre>${highlighted}</pre></div>
+      <div class="oop-concept-panel">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px;">OOP Concepts</div>
+        ${conceptsHtml}
+      </div>`;
+    panelsEl.appendChild(div);
+  });
+
+  // Tab click handlers
+  document.getElementById("oop-tabs").querySelectorAll(".oop-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".oop-tab").forEach(t => { t.classList.remove("active"); t.setAttribute("aria-selected","false"); });
+      document.querySelectorAll(".oop-panel").forEach(p => p.classList.remove("active"));
+      tab.classList.add("active");
+      tab.setAttribute("aria-selected","true");
+      document.getElementById("oop-panel-" + tab.dataset.tab).classList.add("active");
+    });
+  });
+}
+
+// Very light Java syntax highlighter (keywords, comments, strings, annotations)
+function syntaxHighlight(code) {
+  const keywords = ["public","private","class","extends","new","void","return","if","else",
+                    "for","try","catch","throw","throws","final","static","this","super",
+                    "String","double","int","boolean","true","false","null"];
+  let out = escHtml(code);
+  // Single-line comments
+  out = out.replace(/(\/\/[^\n]*)/g, `<span class="cm">$1</span>`);
+  // Strings
+  out = out.replace(/(&quot;[^&]*&quot;)/g, `<span class="str">$1</span>`);
+  // Annotations
+  out = out.replace(/(@\w+)/g, `<span class="ann">$1</span>`);
+  // Keywords
+  keywords.forEach(kw => {
+    out = out.replace(new RegExp(`\\b(${kw})\\b`, "g"), `<span class="kw">$1</span>`);
+  });
+  // Class names (CamelCase)
+  out = out.replace(/\b([A-Z][a-zA-Z0-9]+)\b/g, `<span class="cls">$1</span>`);
+  return out;
+}
+
+/* ================================================================
+   EVENT HANDLERS
+   ================================================================ */
+
+// ---- Navigation ----
+function showPage(name) {
+  document.querySelectorAll(".page").forEach(p => p.classList.add("hidden"));
+  document.querySelectorAll(".nav-item").forEach(n => { n.classList.remove("active"); n.removeAttribute("aria-current"); });
+
+  document.getElementById("page-" + name).classList.remove("hidden");
+  const navBtn = document.querySelector(`.nav-item[data-nav="${name}"]`);
+  if (navBtn) { navBtn.classList.add("active"); navBtn.setAttribute("aria-current","page"); }
+
+  // Close mobile sidebar
+  document.getElementById("sidebar").classList.remove("open");
+}
+
+function showApp(user) {
+  currentUser = user;
+  document.getElementById("screen-login").classList.add("hidden");
+  document.getElementById("screen-app").classList.remove("hidden");
+  document.getElementById("mobile-topbar").classList.remove("hidden");
+
+  if (user) {
+    document.getElementById("sidebar-name").textContent    = user.name;
+    document.getElementById("sidebar-role").textContent    = user.role;
+    document.getElementById("sidebar-avatar").textContent  = user.initials;
+    document.getElementById("dash-greeting").textContent   = `Hello, ${user.name.split(" ")[0]}`;
+  }
+
+  buildTestsPage();
+  buildOopPage();
+  showPage("dashboard");
+
+  // Start data refresh every 2 seconds
+  if (updateInterval) clearInterval(updateInterval);
+  updateDashboard();
+  updateInterval = setInterval(updateDashboard, 2000);
+}
+
+// ---- Login ----
+document.getElementById("login-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const email = document.getElementById("login-email").value.trim();
+  const pass  = document.getElementById("login-password").value;
+  const errEl = document.getElementById("login-error");
+
+  errEl.classList.add("hidden");
+
+  // OOP: Exception Handling – throw AuthenticationError for bad credentials
+  try {
+    if (!email || !pass) {
+      throw new AuthenticationError("Please enter both email and password.");
+    }
+    if (email !== DEMO_USER.email || pass !== DEMO_USER.password) {
+      throw new AuthenticationError("Incorrect email or password. Use the demo account shown below.");
+    }
+    showApp(DEMO_USER);
+  } catch (err) {
+    if (err instanceof AuthenticationError) {
+      errEl.textContent = err.message;
+      errEl.classList.remove("hidden");
+    }
+  }
+});
+
+// Skip link
+document.getElementById("skip-login").addEventListener("click",   () => showApp(DEMO_USER));
+document.getElementById("skip-login").addEventListener("keydown", (e) => { if (e.key === "Enter") showApp(DEMO_USER); });
+
+// Log out
+document.getElementById("btn-logout").addEventListener("click", () => {
+  if (updateInterval) clearInterval(updateInterval);
+  currentUser = null;
+  alertService.clearPrevious();
+  Object.keys(_prevCrit).forEach(k => delete _prevCrit[k]);
+  document.getElementById("screen-app").classList.add("hidden");
+  document.getElementById("screen-login").classList.remove("hidden");
+  document.getElementById("mobile-topbar").classList.add("hidden");
+  document.getElementById("login-email").value    = "";
+  document.getElementById("login-password").value = "";
+  document.getElementById("login-error").classList.add("hidden");
+});
+
+// Nav items
+document.querySelectorAll(".nav-item[data-nav]").forEach(btn => {
+  btn.addEventListener("click", () => showPage(btn.dataset.nav));
+});
+
+// Demo mode segmented switch
+document.querySelectorAll(".seg-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".seg-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    dataSource.setMode(btn.dataset.mode);
+    // Reset alert tracking so mode switches register correctly
+    alertService.clearPrevious();
+    Object.keys(_prevCrit).forEach(k => delete _prevCrit[k]);
+    updateDashboard();
+  });
+});
+
+// Chart sensor selector
+document.getElementById("chart-sensor-select").addEventListener("change", renderChart);
+
+// Mobile hamburger
+document.getElementById("hamburger").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.toggle("open");
+});
+document.getElementById("hamburger").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); document.getElementById("sidebar").classList.toggle("open"); }
+});
+
+// ---- Run live tests (Test Results page) ----
+document.getElementById("btn-run-live").addEventListener("click", () => {
+  const wrap = document.getElementById("live-test-wrap");
+  const out  = document.getElementById("live-test-output");
+  wrap.classList.remove("hidden");
+
+  const lines = [];
+  const log   = (...args) => lines.push(args.join(" "));
+  const t0    = performance.now();
+
+  log("SafeSense – Live Test Run");
+  log("========================================");
+
+  // Threshold boundary tests
+  const cases = [
+    { label:"Sound  84.9 dB",    s: new SoundSensor("S","L", new Threshold(85,100)),   val:84.9,  set:"db",  exp:"NORMAL"   },
+    { label:"Sound  85.0 dB",    s: new SoundSensor("S","L", new Threshold(85,100)),   val:85.0,  set:"db",  exp:"WARNING"  },
+    { label:"Sound  100.0 dB",   s: new SoundSensor("S","L", new Threshold(85,100)),   val:100.0, set:"db",  exp:"CRITICAL" },
+    { label:"CO     34.9 ppm",   s: new GasSensor("G","L","CO", new Threshold(35,200)),val:34.9,  set:"gas", exp:"NORMAL"   },
+    { label:"CO     35.0 ppm",   s: new GasSensor("G","L","CO", new Threshold(35,200)),val:35.0,  set:"gas", exp:"WARNING"  },
+    { label:"CO     200.0 ppm",  s: new GasSensor("G","L","CO", new Threshold(35,200)),val:200.0, set:"gas", exp:"CRITICAL" },
+    { label:"H2S    10.0 ppm",   s: new GasSensor("G","L","H2S",new Threshold(10,50)), val:10.0,  set:"gas", exp:"WARNING"  },
+    { label:"H2S    50.0 ppm",   s: new GasSensor("G","L","H2S",new Threshold(10,50)), val:50.0,  set:"gas", exp:"CRITICAL" },
+    { label:"Methane 999 ppm",   s: new GasSensor("G","L","M",  new Threshold(1000,5000)),val:999, set:"gas",exp:"NORMAL"   },
+    { label:"Methane 5000 ppm",  s: new GasSensor("G","L","M",  new Threshold(1000,5000)),val:5000,set:"gas",exp:"CRITICAL" },
+    { label:"setGasLevel(30.0)", s: new GasSensor("G","L","CO", new Threshold(35,200)),val:30.0,  set:"gas", exp:"NORMAL"   },
+    { label:"setGasLevel(120.5)",s: new GasSensor("G","L","CO", new Threshold(35,200)),val:120.5, set:"gas", exp:"CRITICAL" },
+  ];
+
+  cases.forEach(c => {
+    const ts = performance.now();
+    if (c.set === "db")  c.s.setDecibelLevel(c.val);
+    else                 c.s.setGasLevel(c.val);
+    const r = c.s.checkSafetyStatus();
+    const ok = r.status === c.exp;
+    const dt = (performance.now() - ts).toFixed(2);
+    log(`${ok ? "✓ PASS" : "✗ FAIL"}  ${c.label.padEnd(22)} → ${r.status.padEnd(9)} (expected ${c.exp}) [${dt} ms]`);
+  });
+
+  // Exception handling test
+  log("");
+  log("Exception handling:");
+  const ex = new GasSensor("G","L","CO", new Threshold(35,200));
+  ex.setGasLevel(-15.0);
+  log(`  setGasLevel(-15.0) → level=${ex.getGasLevel()}, hasError=${ex._hasError}  ${ex._hasError ? "✓ PASS" : "✗ FAIL"}`);
+  const nx = new GasSensor("G","L","CO", new Threshold(35,200));
+  nx.setGasLevel(NaN);
+  log(`  setGasLevel(NaN)   → level=${nx.getGasLevel()}, hasError=${nx._hasError}  ${nx._hasError ? "✓ PASS" : "✗ FAIL"}`);
+
+  // Polymorphism test
+  log("");
+  log("Polymorphism loop (4 sensors):");
+  const mgr2 = new SensorManager();
+  mgr2.applyReading({ sound:67, co:6, h2s:1.9, methane:183 });
+  mgr2.sensors.forEach(s => {
+    const r = s.checkSafetyStatus();
+    log(`  ${s.getSensorName().padEnd(28)} → ${r.status}`);
+  });
+
+  const total   = performance.now() - t0;
+  log("");
+  log(`All tests complete in ${total.toFixed(1)} ms`);
+
+  out.textContent = lines.join("\n");
+});
+
+// ---- Run demo (OOP Code page) ----
+document.getElementById("btn-run-demo").addEventListener("click", () => {
+  const wrap = document.getElementById("run-demo-wrap");
+  const out  = document.getElementById("run-demo-output");
+  wrap.classList.remove("hidden");
+
+  const lines = [];
+
+  // Replicate the Main.java demo output exactly
+  const gas   = new GasSensor("Gas Sensor",   "Workshop Line 2", "Carbon monoxide", new Threshold(35, 200));
+  const sound = new SoundSensor("Sound Sensor","Workshop Line 2", new Threshold(85, 100));
+
+  gas.setGasLevel(10.0);         // NORMAL
+  lines.push(`Location: ${gas.getLocation()} / Status: ${gas.checkSafetyStatus().status} - ${gas.checkSafetyStatus().message}`);
+
+  gas.setGasLevel(300.0);        // CRITICAL
+  lines.push(`Location: ${gas.getLocation()} / Status: ${gas.checkSafetyStatus().status} - Toxic gas detected!`);
+
+  // Exception – captured from console
+  const origErr = console.error;
+  let caught = "";
+  console.error = (...args) => { caught = args.join(" "); origErr(...args); };
+  gas.setGasLevel(-5.0);
+  console.error = origErr;
+  lines.push(caught || "ERROR INPUT: Gas level cannot be negative!");
+
+  sound.setDecibelLevel(90);
+  lines.push(`Location: ${sound.getLocation()} / Status: ${sound.checkSafetyStatus().status} - Noise level is high.`);
+
+  out.textContent = lines.join("\n");
+});
+
+/* ================================================================
+   INITIALISE – show login screen on load
+   ================================================================ */
+document.getElementById("mobile-topbar").classList.add("hidden");
+// Login screen is visible by default (not .hidden)
+// App shell starts hidden
+</script>
+</body>
+</html>
